@@ -1,4 +1,13 @@
+<!-- omit in toc -->
 # x9chroot
+
+<!-- omit in toc -->
+## Table of contents
+
+- [Purpose](#purpose)
+- [Why](#why)
+- [Usage](#usage)
+- [Known limitations](#known-limitations)
 
 ## Purpose
 
@@ -32,10 +41,10 @@ TL;DR: A lot of research and effort went into what seems like a dead-simple goal
 
 ## Known limitations
 
-- Written and tested only on Ubuntu 18.04. (It should work on older and newer versions though, as well as other distros. The locations of important system binaries are not hard-coded.)
+- Written and tested only on Ubuntu 18.04. It should work on older and newer versions though, as well as other distros. The locations of important system binaries are not hard-coded.
 - The copy functionality (arguments 2 through 9) could be better. Either way, it's probably better, and generally easier, to:
   1. Create the environment (`x9chroot create`).
   1. Exit out of it, so that you can access both inside the chroot directory structure, *and* the broader filesystem outside of it (`exit`).
   1. Manually copy what you need and exactly where you need it in the chroot file structure, via graphical file manager (or, for example, midnight commander), which is located by default at `/var/x9chroot/`.
   1. Enter back into the chroot environment (`x9chroot enter`).
-- The terminal prompt is slightly wonky. Instead of showing `~` for the home directory. For example, e.g. instead of `x9chroot@username:~ $`, it shows `x9chroot@username:/home/username $`.
+- The terminal prompt is slightly wonky. Instead of showing `~` for the home directory, it shows the full path. For example, e.g. instead of `x9chroot@username:~ $`, it shows `x9chroot@username:/home/username $`.
