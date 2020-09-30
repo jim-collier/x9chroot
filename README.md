@@ -23,7 +23,7 @@ It is also somewhat suprising how difficult it is, to chroot into a chroot envir
 ## Usage
 
 | Command | Description |
-|:--- |:--- |:--- |
+|:--- |:--- |
 | `x9chroot` | Displays help. |
-| `x9chroot create [file1|dir1 to copy to ~] ... [file8|dir8 to copy to ~]` | [Re-]creates and enters the chroot as current user. |
-| `x9chroot enter  [file1|dir1 to copy to ~] ... [file8|dir8 to copy to ~]` | Enters previously created chroot as current user. |
+| `x9chroot create [file1\|dir1 to copy to ~] ... [file8\|dir8 to copy to ~]` | [Re-]creates and enters the chroot as current user. |
+| `x9chroot enter  [file1\|dir1 to copy to ~] ... [file8\|dir8 to copy to ~]` | Enters previously created chroot as current user. |
