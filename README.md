@@ -18,7 +18,7 @@ LXD or Docker containers, for example, are too heavy and full-featured for this 
 
 Likewise, a virtual machine with a common Linux distro can't actually be created, practically speaking, this bare-bones.
 
-It is also somewhat suprising how difficult it is, to chroot into a chroot environment and arrive as your own unprivleged user. (Answers can be found, but most don't work - at least on Ubuntu 18.04.*.
+It is also somewhat suprising how difficult it is, to chroot into a chroot environment and arrive as your own unprivleged user. (Answers can be found, but most don't work - at least on Ubuntu 18.04.*.)
 
 ## Usage
 
@@ -27,3 +27,12 @@ It is also somewhat suprising how difficult it is, to chroot into a chroot envir
 | `x9chroot` | Displays help. |
 | `x9chroot create [file1\|dir1 to copy to ~] ... [file8\|dir8 to copy to ~]` | [Re-]creates and enters the chroot as current user. |
 | `x9chroot enter  [file1\|dir1 to copy to ~] ... [file8\|dir8 to copy to ~]` | Enters previously created chroot as current user. |
+
+## Known limitations
+
+- Written and tested only on Ubuntu 18.04. (It should work on older and newer versions though, as well as other distros. The locations of important system binaries are not hard-coded.)
+- The copy functionality (arguments 2 through 9) could be better. Either way, it's probably better, and generally easier, to:
+  1. Create the environment (`x9chroot create`).
+  1. Exit out of it, so that you can access both inside the chroot directory structure, *and* the broader filesystem outside of it (`exit`).
+  1. Manually copy what you need and exactly where you need it in the chroot file structure, via graphical file manager (or, for example, midnight commander), which is located by default at `/var/x9chroot/`.
+  1. Enter back into the chroot environment (`x9chroot enter`).
