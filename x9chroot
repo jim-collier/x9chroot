@@ -142,6 +142,7 @@ function fMain(){
 		fCopyWhichProgramAndDependencies htop
 		fCopyWhichProgramAndDependencies id
 		fCopyWhichProgramAndDependencies iotop
+		fCopyWhichProgramAndDependencies ldd
 		fCopyWhichProgramAndDependencies less
 		fCopyWhichProgramAndDependencies ln
 		fCopyWhichProgramAndDependencies locate
@@ -282,7 +283,7 @@ function fCopyAllToTargetDir(){
 						echo "    WARNING: Filespec not found '${copyArgCA}'."
 					else
 						echo "    Copying '${copyArgCA}' to '${CHROOT}$2/' ..."
-						sudo cp -a "${copyArgCA}" "${CHROOT}$2/"
+						sudo cp --preserve=all "${copyArgCA}" "${CHROOT}$2/"
 					fi
 				fi
 			done
@@ -325,7 +326,7 @@ function fCopyWithParents(){
 			#	echo "    WARNING: Could not find '${copyArg}', skipping."
 			else
 			#	echo "    '${copyArg}'"
-				sudo cp --parents ${copyWithParents_ExtraFlags} "$(realpath --no-symlinks "${copyArg}")" "${CHROOT}/"
+				sudo cp --preserve=all --parents ${copyWithParents_ExtraFlags} "$(realpath --no-symlinks "${copyArg}")" "${CHROOT}/"
 			fi
 		fi
 
@@ -369,10 +370,8 @@ function fCopyWhichProgramAndDependencies() {
 
 function fThrowError(){
 	echo
-	if [[ -z "$1" ]]; then
-		echo "An error occurred."
-	else
-		echo "Error: $1"
+	if [[ -z "$1" ]]; then echo "An error occurred."
+	else                   echo "Error: $1"
 	fi
 	echo
 	exit 1
