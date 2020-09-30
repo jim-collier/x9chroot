@@ -1,0 +1,384 @@
+#!/bin/bash
+
+##	Purpose:
+##		- Creates and/or enters a chroot jail.
+##		- Not for security purposes, but for testing in a clean, minimal environment.
+##	History:
+##		- 20200928 JC: Created.
+
+
+declare -r chrootName="x9chroot"
+declare -r chrootBasedir="/var"
+declare -r defaultTerminal="xterm1"
+
+
+function fMain(){
+
+	## Constants
+	local -r userName="${USER}"
+	local -r userHome="${HOME}"
+	local -r CHROOT="${chrootBasedir}/${chrootName}"
+	export CHROOT
+
+	## Variables
+	local -i doCreate=0
+
+	## Validate
+	[[ -z "$(which realpath 2>/dev/null || true)" ]] && fThrowError "Dependency not found in path: 'realpath'."
+	[[ -z "$(which trash    2>/dev/null || true)" ]] && fThrowError "Dependency not found in path: 'trash'."
+	[[ -z "$(which ldd      2>/dev/null || true)" ]] && fThrowError "Dependency not found in path: 'ldd'."
+	[[    "${EUID}" -eq 0                         ]] && fThrowError "Must not be run with sudo or as root. Will prompt for sudo permissions when necessary."
+	[[ -z "${CHROOT}"                             ]] && fThrowError "Variable must not be an empty string: CHROOT."
+	[[    "${CHROOT}" == "/"                      ]] && fThrowError "Variable CHROOT cannot be set to '/'."
+
+	## Are we creating, or just entering?
+	echo " $1 " | grep -iPo ".* create .*" 2>/dev/null || true
+	if [[ -n "$(echo " $1 " | grep -iPo ".* create .*" 2>/dev/null || true)" ]]; then
+		doCreate=1
+		shift || true
+	elif [[ -n "$(echo " $1 " | grep -iPo ".* enter .*" 2>/dev/null || true)" ]]; then
+		[[ -z "$(ls -A "${CHROOT}" 2>/dev/null || true)" ]] && fThrowError "chroot '${CHROOT}' doesn't seem to exist. Create it via '$(basename "$0")'."
+		shift || true
+	else
+		echo
+		echo "Creates and/or enters a limited environment with only the bare minimum"
+		echo "essentials available to operate, plus anything specified on the command line"
+		echo "to copy to home folder."
+		echo
+		echo "Syntax: $(basename "$0") <create|enter> [optional filespec[s] to copy to '/home/user/'."
+		echo
+		exit 1
+	fi
+
+	if [[ ${doCreate} -eq 1 ]]; then
+
+		## Inform and prompt
+		echo
+		echo "Going to create a new minimal chroot jail for the current user,"
+		echo "Files or folders specified on command line will copied into the jail."
+		echo
+		echo "chroot ...: ${CHROOT}"
+		echo "user .....: ${userName}"
+		echo "home .....: ${CHROOT}${userHome}"
+
+		echo
+		if [[ -d "${CHROOT}" ]]; then
+			echo "Existing contents of '${CHROOT}':"
+			echo
+			sudo du -h --total --max-depth=1 "${CHROOT}"
+		else
+			echo "There is currently nothing at '${CHROOT}'."
+		fi
+
+		echo
+		read -p "Continue? (y/N): " answer
+		if [[ "${answer,,}" != "y" ]]; then echo "[ User aborted. ]"; echo; exit 1; fi
+
+		## Validate sudo
+		echo
+		echo "[ Verifying sudo ... ]"
+		sudo echo "[ Sudo verified. ]"
+
+		echo
+		echo "[ Setting up directories... ]"
+
+		# setup directory layout
+		if [[ -d "${CHROOT}" ]]; then sudo trash "${CHROOT}"; fi
+		sudo mkdir -p "${CHROOT}"/{dev,etc,home,tmp,proc,root,var}
+
+		# setup dev
+		sudo mknod          "${CHROOT}/dev"/null    c 1 3
+		sudo mknod          "${CHROOT}/dev"/zero    c 1 5
+		sudo mknod          "${CHROOT}/dev"/tty     c 5 0
+		sudo mknod          "${CHROOT}/dev"/random  c 1 8
+		sudo mknod          "${CHROOT}/dev"/urandom c 1 9
+		sudo chmod 0666     "${CHROOT}/dev"/{null,tty,zero}
+		sudo chown root.tty "${CHROOT}/dev"/tty
+
+		##
+		## copy programs and libraries
+		##
+
+	#	echo
+		echo "[ Copying basic system-level files ... ]"
+
+		# ARCH amd64 and i386
+		fCopyWithParents "/lib64/ld-linux-x86-64.so.2"
+	#	if [ -f /lib64/ld-linux-x86-64.so.2 ]; then cp --parents /lib64/ld-linux-x86-64.so.2 "${CHROOT}"/; fi
+		fCopyWithParents "/lib/ld-linux.so.2"
+	#	if [ -f  /lib/ld-linux.so.2 ]; then cp --parents /lib/ld-linux.so.2 "${CHROOT}"/; fi
+
+		# copy basic system level files
+		fCopyWithParents           "/etc/group"
+		fCopyWithParents           "/etc/hosts"
+		fCopyWithParents           "/etc/nsswitch.conf"
+		fCopyWithParents           "/etc/passwd"
+		fCopyWithParents           "/etc/resolv.conf"
+		fCopyWithParents           "/etc/shadow"
+		fCopyWithParents           "/lib/x86_64-linux-gnu/libnss_"*
+		fCopyWithParents           "/lib32/libnss_"*
+		fCopyWithParents           "/lib/libnss_"*
+		fCopyWithParents           "/lib/x86_64-linux-gnu/libncurses"*
+
+		## Copy minimal functional stuff
+	#	echo
+		echo "[ Copying minimal functional binaries and their dependencies ... ]"
+		fCopyWhichProgramAndDependencies apt
+		fCopyWhichProgramAndDependencies apt-get
+		fCopyWhichProgramAndDependencies basename
+		fCopyWhichProgramAndDependencies bash
+		fCopyWhichProgramAndDependencies cat
+		fCopyWhichProgramAndDependencies cp
+		fCopyWhichProgramAndDependencies cut
+		fCopyWhichProgramAndDependencies df
+		fCopyWhichProgramAndDependencies dirname
+		fCopyWhichProgramAndDependencies dpkg
+		fCopyWhichProgramAndDependencies du
+		fCopyWhichProgramAndDependencies env
+		fCopyWhichProgramAndDependencies find
+		fCopyWhichProgramAndDependencies fold
+		fCopyWhichProgramAndDependencies grep
+		fCopyWhichProgramAndDependencies head
+		fCopyWhichProgramAndDependencies htop
+		fCopyWhichProgramAndDependencies id
+		fCopyWhichProgramAndDependencies iotop
+		fCopyWhichProgramAndDependencies less
+		fCopyWhichProgramAndDependencies ln
+		fCopyWhichProgramAndDependencies locate
+		fCopyWhichProgramAndDependencies login
+		fCopyWhichProgramAndDependencies ls
+		fCopyWhichProgramAndDependencies mc
+		fCopyWhichProgramAndDependencies mkdir
+		fCopyWhichProgramAndDependencies more
+		fCopyWhichProgramAndDependencies mv
+		fCopyWhichProgramAndDependencies nano
+		fCopyWhichProgramAndDependencies pwd
+		fCopyWhichProgramAndDependencies realpath
+		fCopyWhichProgramAndDependencies rm
+		fCopyWhichProgramAndDependencies screen
+		fCopyWhichProgramAndDependencies sed
+		fCopyWhichProgramAndDependencies sftp
+		fCopyWhichProgramAndDependencies sh
+		fCopyWhichProgramAndDependencies ssh
+		fCopyWhichProgramAndDependencies su
+		fCopyWhichProgramAndDependencies sudo
+		fCopyWhichProgramAndDependencies tail
+		fCopyWhichProgramAndDependencies top
+		fCopyWhichProgramAndDependencies tput
+		fCopyWhichProgramAndDependencies vi
+		fCopyWhichProgramAndDependencies which
+		fCopyWhichProgramAndDependencies whoami
+		fCopyWhichProgramAndDependencies xargs
+
+		# Copy resource files
+		fCopyWithParents_recursive "/usr/share/nano"
+		fCopyWithParents_recursive "/usr/share/terminfo"
+
+		## Copy custom stuff
+		fCopyWhichToTarget  d          /usr/local/bin
+		fCopyWhichToTarget  x9edwhich  /usr/local/bin
+
+		## Creating profile stuff
+	#	cat <<- EOF | sudo tee "${CHROOT}/etc/profile" &>/dev/null
+	#	export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	#	export TERM=${defaultTerminal}
+	#	export TERMINFO=/usr/share/terminfo
+	#	EOF
+
+
+		[[ ! -d "${CHROOT}${userHome}" ]] && sudo mkdir -p "${CHROOT}${userHome}"
+		sudo touch "${CHROOT}${userHome}/.bash_history"
+
+		cat <<- EOF | sudo tee "${CHROOT}${userHome}/.bashrc" &>/dev/null
+		case \$- in
+			*i*) ;;
+			*) return ;;
+		esac
+		HISTCONTROL=ignoreboth
+		shopt -s histappend
+		HISTSIZE=1000
+		HISTFILESIZE=2000
+		shopt -s checkwinsize
+		[ -x /usr/bin/lesspipe ] && eval "\$(SHELL=/bin/sh lesspipe)"
+		color_prompt=yes
+		unset color_prompt force_color_prompt
+		alias grep="grep --color=auto"
+		export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+		export TERM="${defaultTerminal}"
+		export TERMINFO=/usr/share/terminfo
+		export PS1="\[\e[36m\]\u\[\e[m\]@\[\e[31m\]${chrootName}\[\e[m\]:\[\e[33m\]\w \[\e[32m\]\\$\[\e[m\] "
+		#export PS1="\[\e[36m\]${userName}\[\e[m\]@\[\e[31m\]${chrootName}\[\e[m\]:\[\e[33m\]\W\[\e[m\] \[\e[32m\]\\$\[\e[m\] "
+		#export PS1="\[\e[0;208m\]${userName}\[\e[0;90m\]@\[\e[1;208m\]${chrootName}\[\e[0;90m\]:\[\e[0;208m\]\w\[\e[m\] \$ "
+		#export PS1="${userName}@${chrootName}:\w \$ "
+		#export PS1="\u@$\h:\w \$ "
+		cd ~
+		EOF
+		sudo chmod +x "${CHROOT}${userHome}/.bashrc"
+
+		cat <<- EOF | sudo tee "${CHROOT}${userHome}/.profile" &>/dev/null
+		export PATH="${PATH}"
+		EOF
+
+		## Copy arguments
+		if [[ -n "$1" ]]; then
+		#	echo
+			echo "[ Copying files specified on command line ... ]"
+			fCopyAllToTargetDir  "$1"  "${userHome}"
+			fCopyAllToTargetDir  "$2"  "${userHome}"
+			fCopyAllToTargetDir  "$3"  "${userHome}"
+			fCopyAllToTargetDir  "$4"  "${userHome}"
+			fCopyAllToTargetDir  "$5"  "${userHome}"
+			fCopyAllToTargetDir  "$6"  "${userHome}"
+			fCopyAllToTargetDir  "$7"  "${userHome}"
+			fCopyAllToTargetDir  "$8"  "${userHome}"
+			fCopyAllToTargetDir  "$9"  "${userHome}"
+		fi
+
+	#	echo
+		echo "[ Configuring SSH public keys for root and ${userName}. ]"
+		[[ -n "$( ls -A "/root/.ssh"/*.pub       2>/dev/null || true)" ]] && fCopyWithParents_recursive "/root/.ssh"/*.pub
+		[[ -n "$( ls -A "${userHome}/.ssh"/*.pub 2>/dev/null || true)" ]] && fCopyWithParents_recursive "${userHome}/.ssh"/*.pub
+
+	#	echo
+		echo "[ Setting permissions. ]"
+	#	sudo chown  -R  root:root                "${CHROOT}"
+	#	sudo chmod  -R  go+r,go-w                "${CHROOT}"
+		sudo chmod  -R  go-rw                    "${CHROOT}/root"
+		sudo chown  -R  ${userName}:${userName}  "${CHROOT}${userHome}"
+		if [[ -d "${CHROOT}/root/.ssh"       ]]; then sudo chmod -R 0700 "${CHROOT}/root/.ssh"; fi
+		if [[ -d "${CHROOT}${userHome}/.ssh" ]]; then sudo chmod -R 0700 "${CHROOT}${userHome}/.ssh"; fi
+
+		echo
+		echo "[ Chroot jail is created. Entering now. Type 'exit' to escape. ]"
+		echo
+
+	else
+		echo
+		echo "[ Entering existing chroot jail. Type 'exit' to escape. ]"
+		echo
+	fi
+
+#	fakechroot fakeroot chroot "${CHROOT}"  #env -i TERM=$TERM /bin/bash
+	local doCmd="sudo chroot --userspec=${userName} '${CHROOT}' env -i TERM=$TERM /bin/bash"
+	eval "${doCmd}"
+
+	echo
+	echo "[ Escaped jail. ]"
+	echo
+
+}
+
+
+function fCopyAllToTargetDir(){
+	if [[ -n "$1" ]]; then
+		if [[ -z "$2" ]]; then
+			echo "    WARNING: No target folder specified."
+		elif [[ ! -d "${CHROOT}$2" ]]; then
+			echo "    WARNING: Target folder '${CHROOT}$2' doesn't exist, skipping."
+		else
+			for copyArgCA in "$1"; do
+				if [[ -n "${copyArgCA}" ]]; then
+					if [[ ! -e "${copyArgCA}" ]]; then
+						echo "    WARNING: Filespec not found '${copyArgCA}'."
+					else
+						echo "    Copying '${copyArgCA}' to '${CHROOT}$2/' ..."
+						sudo cp -a "${copyArgCA}" "${CHROOT}$2/"
+					fi
+				fi
+			done
+		fi
+	fi
+}
+
+
+function fCopyWhichToTarget(){
+	if [[ -n "$1" ]]; then
+
+		local -r programToCopy="$(which "$1" 2>/dev/null || true)"
+		local -r copyToTarget="$2"
+
+		if [[ -n "${programToCopy}" ]]; then
+			if [[ ! -f "${programToCopy}" ]]; then
+				echo "    WARNING: Could not find '$1', skipping."
+			elif [[ -z "${copyToTarget}" ]]; then
+				echo "    WARNING: fCopyWhichToTarget(): Target folder not specified."
+			else
+				if [[ ! -d "${CHROOT}${copyToTarget}" ]]; then sudo mkdir -p "${CHROOT}${copyToTarget}"; fi
+			#	echo "    '${programToCopy}'  -->  '${CHROOT}${copyToTarget}'"
+				sudo cp "${programToCopy}" "${CHROOT}${copyToTarget}"
+			fi
+		fi
+
+	fi
+}
+
+
+function fCopyWithParents(){
+
+	for copyArg in "$@"; do
+
+		## Debug
+		#echo "fCopyWithParents(): copyArg = '${copyArg}'"
+
+		if [[ -n "${copyArg}" ]]; then
+			if [[ ! -e ${copyArg} ]]; then :;
+			#	echo "    WARNING: Could not find '${copyArg}', skipping."
+			else
+			#	echo "    '${copyArg}'"
+				sudo cp --parents ${copyWithParents_ExtraFlags} "$(realpath --no-symlinks "${copyArg}")" "${CHROOT}/"
+			fi
+		fi
+
+	done
+
+}
+
+
+function fCopyWithParents_recursive(){
+	copyWithParents_ExtraFlags="-r"
+		for copyArgR in "$@"; do
+			fCopyWithParents "${copyArgR}"
+		done
+	copyWithParents_ExtraFlags=""
+}
+
+
+function fCopyWhichProgramAndDependencies() {
+
+	if [[ -n "$1" ]]; then
+
+		local -r programToCopy="$(which "$1" 2>/dev/null || true)"
+
+		if [[ -z "${programToCopy}" ]]; then
+			echo "    WARNING: Could not find '$1', skipping."
+		else
+
+			## Copy the which program
+			fCopyWithParents "${programToCopy}"
+
+			## Copy the program's dependencies
+			for i in $(ldd "${programToCopy}" | grep -v "dynamic" | cut -d " " -f 3 | sed 's/://' | sort | uniq); do
+				fCopyWithParents "$i"
+			done
+
+		fi
+	fi
+
+}
+
+
+function fThrowError(){
+	echo
+	if [[ -z "$1" ]]; then
+		echo "An error occurred."
+	else
+		echo "Error: $1"
+	fi
+	echo
+	exit 1
+}
+
+
+set -e
+set -E
+fMain  "$1"  "$2"  "$3"  "$4"  "$5"  "$6"  "$7"  "$8"  "$9"
