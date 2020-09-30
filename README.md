@@ -18,7 +18,9 @@ LXD or Docker containers, for example, are too heavy and full-featured for this 
 
 Likewise, a virtual machine with a common Linux distro can't actually be created, practically speaking, this bare-bones.
 
-It is also somewhat suprising how difficult it is, to chroot into a chroot environment and arrive as your own unprivleged user. (Answers can be found, but most don't work - at least on Ubuntu 18.04.*.)
+It is also somewhat suprising how difficult it is, to chroot into a chroot environment and arrive as your own unprivleged user. (Answers can be found, but most don't work - at least on Ubuntu 18.04.\*.) It was even a challenge to get the terminal fully-functional.
+
+TL;DR: A lot of research and effort went into what seems like a dead-simple goal.
 
 ## Usage
 
@@ -36,3 +38,4 @@ It is also somewhat suprising how difficult it is, to chroot into a chroot envir
   1. Exit out of it, so that you can access both inside the chroot directory structure, *and* the broader filesystem outside of it (`exit`).
   1. Manually copy what you need and exactly where you need it in the chroot file structure, via graphical file manager (or, for example, midnight commander), which is located by default at `/var/x9chroot/`.
   1. Enter back into the chroot environment (`x9chroot enter`).
+- The terminal prompt is slightly wonky. Instead of showing `~` for the home directory. For example, e.g. instead of `x9chroot@username:~ $`, it shows `x9chroot@username:/home/username $`.
